@@ -1,0 +1,127 @@
+:root {
+  color-scheme: dark;
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  background: #071723;
+  color: #e6f5fb;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: radial-gradient(ellipse at top, #12354a 0%, #071723 65%);
+}
+
+main {
+  width: min(900px, 100%);
+  margin: 0 auto;
+  padding: 28px 18px 48px;
+}
+
+.hero { margin-bottom: 4px; }
+h1 { margin: 0 0 8px; font-size: 2.1rem; letter-spacing: .5px; }
+h2 { margin-top: 0; }
+p  { line-height: 1.5; color: #bed2dc; }
+
+.panel {
+  margin-top: 20px;
+  padding: 20px;
+  border: 1px solid #315368;
+  border-radius: 14px;
+  background: #0b2130e8;
+}
+
+.button-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+button, textarea { font: inherit; }
+
+button {
+  padding: 10px 14px;
+  border: 1px solid #3e718c;
+  border-radius: 8px;
+  color: #eaf8ff;
+  background: #12384d;
+  cursor: pointer;
+  transition: background .15s, transform .1s;
+}
+button:hover:not(:disabled)  { background: #1b506c; }
+button:active:not(:disabled) { transform: translateY(1px); }
+button:disabled              { opacity: .45; cursor: not-allowed; }
+button.active                { outline: 2px solid #69d1e7; }
+
+button.primary {
+  background: #1b6e8f;
+  border-color: #3fa9c9;
+}
+button.primary:hover:not(:disabled) { background: #2589ad; }
+
+button.link-button {
+  background: transparent;
+  border: none;
+  color: #9bb6c4;
+  text-decoration: underline;
+  padding: 6px 4px;
+}
+button.link-button:hover { color: #e6f5fb; background: transparent; }
+
+textarea {
+  display: block;
+  width: 100%;
+  min-height: 100px;
+  margin: 8px 0 12px;
+  padding: 10px;
+  border: 1px solid #315368;
+  border-radius: 8px;
+  color: #e6f5fb;
+  background: #06131d;
+  resize: vertical;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.88rem;
+  word-break: break-all;
+}
+
+label { display: block; margin-top: 16px; font-weight: 500; }
+
+.muted { color: #9bb6c4; font-size: .92rem; }
+.status { min-height: 1.5em; color: #8de0e9; }
+.hidden { display: none !important; }
+
+.steps {
+  margin: 0 0 16px;
+  padding-left: 20px;
+  color: #bed2dc;
+  font-size: .94rem;
+  line-height: 1.6;
+}
+.steps li::marker { color: #69d1e7; font-weight: 600; }
+
+.code-meta {
+  margin: -6px 0 10px;
+  font-size: .85rem;
+}
+
+.canvas-slot { width: 100%; }
+
+#gameCanvas {
+  width: 100%;
+  height: min(65vh, 560px);
+  min-height: 360px;
+  display: block;
+  border: 1px solid #315368;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #081b28;
+  touch-action: none;
+}
+
+footer {
+  margin-top: 32px;
+  text-align: center;
+  font-size: .85rem;
+}

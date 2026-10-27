@@ -1,0 +1,933 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Глубина — морской бой</title>
+
+  <link rel="stylesheet" href="style.css" />
+
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+        "three/addons/controls/OrbitControls.js": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/controls/OrbitControls.js"
+      }
+    }
+  </script>
+
+  <!-- LZ-string для сжатия кода приглашения/ответа -->
+  <script src="https://cdn.jsdelivr.net/npm/lz-string@1.5.0/libs/lz-string.min.js"></script>
+</head>
+
+<body>
+<main>
+  <header class="hero">
+    <h1>Глубина</h1>
+    <p>Морской бой в трёх измерениях: 6 × 6 × 4 клетки.</p>
+  </header>
+
+  <section id="menu" class="panel">
+    <h2>Новая игра</h2>
+    <div class="button-row">
+      <button id="hostButton" class="primary">Создать игру</button>
+      <button id="joinButton">Подключиться по приглашению</button>
+    </div>
+    <p class="muted">
+      Оба игрока должны открыть сайт по HTTPS или на localhost.
+      Соединение устанавливается напрямую через WebRTC — без сервера.
+    </p>
+  </section>
+
+  <section id="connection" class="panel hidden">
+    <h2>Подключение</h2>
+    <p id="connectionHelp"></p>
+
+    <div id="offerBlock" class="hidden">
+      <ol class="steps">
+        <li>Скопируйте приглашение и отправьте другу.</li>
+        <li>Друг пришлёт ответ — вставьте его в поле ниже.</li>
+        <li>Нажмите «Подключить ответ».</li>
+      </ol>
+
+      <label for="offerText">Приглашение</label>
+      <textarea id="offerText" readonly></textarea>
+      <p id="offerMeta" class="muted code-meta"></p>
+      <div class="button-row">
+        <button id="copyOfferButton">Скопировать код</button>
+        <button id="copyOfferLinkButton">Скопировать ссылку</button>
+      </div>
+
+      <label for="answerText">Ответ друга</label>
+      <textarea id="answerText" placeholder="Вставьте сюда текст ответа"></textarea>
+      <div class="button-row">
+        <button id="applyAnswerButton" class="primary">Подключить ответ</button>
+      </div>
+    </div>
+
+    <div id="joinBlock" class="hidden">
+      <ol class="steps">
+        <li>Вставьте приглашение хоста.</li>
+        <li>Нажмите «Создать ответ».</li>
+        <li>Отправьте полученный ответ хосту.</li>
+      </ol>
+
+      <label for="joinOfferText">Приглашение хоста</label>
+      <textarea id="joinOfferText" placeholder="Вставьте сюда приглашение"></textarea>
+      <div class="button-row">
+        <button id="createAnswerButton" class="primary">Создать ответ</button>
+      </div>
+
+      <div id="answerBlock" class="hidden">
+        <label for="generatedAnswerText">Ответ для хоста</label>
+        <textarea id="generatedAnswerText" readonly></textarea>
+        <p id="answerMeta" class="muted code-meta"></p>
+        <div class="button-row">
+          <button id="copyAnswerButton">Скопировать код</button>
+        </div>
+      </div>
+    </div>
+
+    <p id="connectionStatus" class="status">Ожидание подключения…</p>
+    <div class="button-row">
+      <button id="goPlacementButton" class="primary" disabled>Перейти к расстановке</button>
+      <button id="restartButton" class="link-button">Начать заново</button>
+    </div>
+  </section>
+
+  <section id="placement" class="panel hidden">
+    <h2>Расстановка флота</h2>
+    <p id="placementInfo"></p>
+    <p class="muted">
+      Выберите ось и нажмите на клетку, где начнётся корабль.
+      Перетаскивайте мышью, чтобы вращать поле.
+    </p>
+    <div class="button-row">
+      <button class="axisButton active" data-axis="x">Ось X</button>
+      <button class="axisButton" data-axis="y">Ось Y</button>
+      <button class="axisButton" data-axis="z">Ось Z</button>
+    </div>
+    <div class="canvas-slot" id="placementCanvasSlot">
+      <canvas id="gameCanvas"></canvas>
+    </div>
+    <p id="placementStatus" class="status"></p>
+    <button id="finishPlacementButton" class="primary" disabled>Готово</button>
+  </section>
+
+  <section id="game" class="panel hidden">
+    <h2>Партия</h2>
+    <p id="gameStatus" class="status"></p>
+    <div class="button-row">
+      <button id="targetViewButton" class="active">Цель</button>
+      <button id="ownViewButton">Мой флот</button>
+    </div>
+    <p class="muted">В режиме «Цель» нажмите клетку, чтобы выстрелить.</p>
+    <div class="canvas-slot" id="gameCanvasSlot"></div>
+  </section>
+
+  <section id="result" class="panel hidden">
+    <h2 id="resultTitle">Игра окончена</h2>
+    <p id="resultText"></p>
+    <button onclick="location.reload()" class="primary">В меню</button>
+  </section>
+
+  <footer class="muted">
+    <p>Three.js + WebRTC. Работает без сервера, только статические файлы.</p>
+  </footer>
+</main>
+
+<script type="module">
+/* ============================================================
+   ИМПОРТЫ
+   ============================================================ */
+import * as THREE from "three";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+
+/* ============================================================
+   CONFIG — все «магические числа» и настройки
+   ============================================================ */
+const SIZE = { x: 6, y: 6, z: 4 };
+const FLEET = [4, 3, 3, 2, 2];
+const STUN_SERVERS = [
+  { urls: "stun:stun.l.google.com:19302" },
+  { urls: "stun:stun1.l.google.com:19302" },
+];
+const ICE_GATHER_TIMEOUT_MS = 15000;
+
+const COLORS = {
+  water:      0x17445b,
+  ship:       0x28a58e,
+  miss:       0xa9bdc6,
+  hit:        0xe75b55,
+  background: 0x081b28,
+};
+
+const SCENE_CFG = {
+  fov: 42, near: 0.1, far: 100,
+  cameraPos: [9, 10, 11],
+  cellSize: 0.88,
+  lightIntensity: 2.2,
+  hemiIntensity: 2,
+};
+
+/* ============================================================
+   STATE — единое изменяемое состояние
+   ============================================================ */
+const state = {
+  role: null,
+  phase: "menu",
+  view: "target",
+  axis: "x",
+
+  ships: [],
+  enemyShips: [],
+  shipIndex: 0,
+  shipsSent: false,
+
+  pendingShot: false,
+
+  match: {
+    shotsHost: [], shotsGuest: [],
+    hitsHost:  [], hitsGuest:  [],
+    turn: "host",
+    winner: null,
+  },
+};
+
+function resetMatch() {
+  state.match = {
+    shotsHost: [], shotsGuest: [],
+    hitsHost:  [], hitsGuest:  [],
+    turn: "host", winner: null,
+  };
+}
+
+/* ============================================================
+   UTILS — чистые функции
+   ============================================================ */
+const cellKey = (c) => `${c.x},${c.y},${c.z}`;
+
+function isInside(c) {
+  return c.x >= 0 && c.x < SIZE.x
+      && c.y >= 0 && c.y < SIZE.y
+      && c.z >= 0 && c.z < SIZE.z;
+}
+
+function cellsFor(start, direction, length) {
+  return Array.from({ length }, (_, i) => {
+    const c = { ...start };
+    c[direction] += i;
+    return c;
+  });
+}
+
+function fleetKeys(fleet) {
+  return new Set(fleet.flatMap((ship) => ship.map(cellKey)));
+}
+
+function isFleetSunk(fleet, hitKeys) {
+  return fleet.every((ship) => ship.every((p) => hitKeys.has(cellKey(p))));
+}
+
+function isValidFleet(fleet) {
+  if (!Array.isArray(fleet) || fleet.length !== FLEET.length) return false;
+  const exp = [...FLEET].sort((a, b) => a - b);
+  const act = fleet.map((s) => (Array.isArray(s) ? s.length : 0)).sort((a, b) => a - b);
+  for (let i = 0; i < FLEET.length; i++) if (exp[i] !== act[i]) return false;
+  const seen = new Set();
+  for (const ship of fleet) {
+    if (!Array.isArray(ship) || ship.length === 0) return false;
+    for (const cell of ship) {
+      if (!isInside(cell)) return false;
+      const k = cellKey(cell);
+      if (seen.has(k)) return false;
+      seen.add(k);
+    }
+  }
+  return true;
+}
+
+/* ============================================================
+   UI — DOM, экраны, копирование
+   ============================================================ */
+const $ = (id) => document.getElementById(id);
+const SCREENS = ["menu", "connection", "placement", "game", "result"];
+
+function showScreen(id) {
+  state.phase = id;
+  SCREENS.forEach((name) => $(name).classList.toggle("hidden", name !== id));
+  window.dispatchEvent(new CustomEvent("screenchange", { detail: { id } }));
+}
+
+function setText(id, text) { const el = $(id); if (el) el.textContent = text; }
+function setStatus(id, text) { setText(id, text); }
+function setConnectionStatus(text) { setText("connectionStatus", text); }
+
+async function copyText(text) {
+  if (!text) return false;
+  try {
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+  } catch { /* fallback ниже */ }
+  try {
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    ta.style.position = "fixed";
+    ta.style.opacity = "0";
+    document.body.appendChild(ta);
+    ta.select();
+    const ok = document.execCommand("copy");
+    document.body.removeChild(ta);
+    return ok;
+  } catch { return false; }
+}
+
+function updateCodeMeta(textareaId, metaId) {
+  const v = $(textareaId)?.value || "";
+  setText(metaId, `Длина кода: ${v.length} символов`);
+}
+
+/* ============================================================
+   WEBRTC — обмен SDP + сжатие LZ
+   ============================================================ */
+let pc = null;
+let channel = null;
+const rtHandlers = {
+  onOpen:    () => {},
+  onClose:   () => {},
+  onMessage: () => {},
+  onStatus:  () => {},
+};
+
+function setHandlers(partial) { Object.assign(rtHandlers, partial); }
+function isOpen() { return channel?.readyState === "open"; }
+
+function send(msg) {
+  if (channel?.readyState === "open") {
+    channel.send(JSON.stringify(msg));
+    return true;
+  }
+  return false;
+}
+
+function bindChannel(ch) {
+  channel = ch;
+  ch.onopen    = () => rtHandlers.onOpen();
+  ch.onclose   = () => rtHandlers.onClose();
+  ch.onerror   = () => rtHandlers.onStatus("Ошибка канала связи.");
+  ch.onmessage = (event) => {
+    try { rtHandlers.onMessage(JSON.parse(event.data)); }
+    catch { rtHandlers.onStatus("Получено некорректное сообщение."); }
+  };
+}
+
+function watchFailure(peer) {
+  peer.onconnectionstatechange = () => {
+    if (peer.connectionState === "failed")
+      rtHandlers.onStatus("Соединение не установлено. Начните заново.");
+  };
+}
+
+function waitIce(peer) {
+  if (peer.iceGatheringState === "complete") return Promise.resolve();
+  return new Promise((resolve) => {
+    const t = setTimeout(resolve, ICE_GATHER_TIMEOUT_MS);
+    peer.addEventListener("icegatheringstatechange", () => {
+      if (peer.iceGatheringState === "complete") {
+        clearTimeout(t); resolve();
+      }
+    });
+  });
+}
+
+function b64Encode(str) {
+  const bytes = new TextEncoder().encode(str);
+  let bin = "";
+  for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+  return btoa(bin);
+}
+function b64Decode(b64) {
+  const bin = atob(b64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return new TextDecoder().decode(bytes);
+}
+
+function encodeCode(desc) {
+  const json = JSON.stringify(desc);
+  if (typeof LZString !== "undefined")
+    return LZString.compressToEncodedURIComponent(json);
+  return b64Encode(json);
+}
+
+function decodeCode(code) {
+  code = code.trim();
+  if (typeof LZString !== "undefined") {
+    const d = LZString.decompressFromEncodedURIComponent(code);
+    if (d) return JSON.parse(d);
+  }
+  try { return JSON.parse(b64Decode(code)); } catch {}
+  return JSON.parse(code);
+}
+
+async function createHostOffer() {
+  pc = new RTCPeerConnection({ iceServers: STUN_SERVERS });
+  watchFailure(pc);
+  bindChannel(pc.createDataChannel("game"));
+
+  const offer = await pc.createOffer();
+  await pc.setLocalDescription(offer);
+  rtHandlers.onStatus("Готовим приглашение…");
+  await waitIce(pc);
+  return encodeCode(pc.localDescription);
+}
+
+async function applyAnswer(answerCode) {
+  const answer = decodeCode(answerCode);
+  await pc.setRemoteDescription(answer);
+  rtHandlers.onStatus("Ответ принят. Подключаемся…");
+}
+
+async function createGuestAnswer(offerCode) {
+  const offer = decodeCode(offerCode);
+  pc = new RTCPeerConnection({ iceServers: STUN_SERVERS });
+  pc.ondatachannel = (e) => bindChannel(e.channel);
+  watchFailure(pc);
+
+  await pc.setRemoteDescription(offer);
+  const answer = await pc.createAnswer();
+  await pc.setLocalDescription(answer);
+  rtHandlers.onStatus("Готовим ответ…");
+  await waitIce(pc);
+  return encodeCode(pc.localDescription);
+}
+
+/* ============================================================
+   SCENE — Three.js
+   ============================================================ */
+let renderer, scene3d, camera, controls, boardGroup;
+let raycaster, pointer, canvas, sharedGeometry;
+let cellClickHandler = null;
+
+const offX = (SIZE.x - 1) / 2;
+const offY = (SIZE.z - 1) / 2;
+const offZ = (SIZE.y - 1) / 2;
+
+function initScene(canvasElement) {
+  canvas = canvasElement;
+  renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setClearColor(COLORS.background);
+
+  scene3d = new THREE.Scene();
+  camera = new THREE.PerspectiveCamera(SCENE_CFG.fov, 1, SCENE_CFG.near, SCENE_CFG.far);
+  camera.position.set(...SCENE_CFG.cameraPos);
+
+  controls = new OrbitControls(camera, renderer.domElement);
+  controls.enableDamping = true;
+  controls.target.set(0, 0, 0);
+
+  scene3d.add(new THREE.HemisphereLight(0xc6f2ff, 0x142431, SCENE_CFG.hemiIntensity));
+  const light = new THREE.DirectionalLight(0xffffff, SCENE_CFG.lightIntensity);
+  light.position.set(5, 9, 7);
+  scene3d.add(light);
+
+  boardGroup = new THREE.Group();
+  scene3d.add(boardGroup);
+
+  sharedGeometry = new THREE.BoxGeometry(
+    SCENE_CFG.cellSize, SCENE_CFG.cellSize, SCENE_CFG.cellSize
+  );
+
+  raycaster = new THREE.Raycaster();
+  pointer = new THREE.Vector2();
+
+  canvas.addEventListener("pointerdown", onPointerDown);
+  window.addEventListener("resize", resizeRenderer);
+  resizeRenderer();
+  animate();
+}
+
+function animate() {
+  requestAnimationFrame(animate);
+  controls.update();
+  renderer.render(scene3d, camera);
+}
+
+function mountTo(slotId) {
+  const slot = $(slotId);
+  if (!slot) return;
+  if (canvas.parentElement !== slot) slot.appendChild(canvas);
+  requestAnimationFrame(() => { resizeRenderer(); drawBoard(); });
+}
+
+function resizeRenderer() {
+  if (!canvas) return;
+  const rect = canvas.getBoundingClientRect();
+  if (!rect.width || !rect.height) return;
+  renderer.setSize(rect.width, rect.height, false);
+  camera.aspect = rect.width / rect.height;
+  camera.updateProjectionMatrix();
+}
+
+function onCellClick(handler) { cellClickHandler = handler; }
+
+function onPointerDown(event) {
+  if (state.phase !== "placement" && state.phase !== "game") return;
+  if (!cellClickHandler) return;
+  const rect = canvas.getBoundingClientRect();
+  pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+  pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+  raycaster.setFromCamera(pointer, camera);
+  const hit = raycaster.intersectObjects(boardGroup.children)[0];
+  if (!hit?.object.userData.cell) return;
+  cellClickHandler(hit.object.userData.cell);
+}
+
+function drawBoard() {
+  if (!boardGroup) return;
+  if (state.phase !== "placement" && state.phase !== "game") return;
+
+  while (boardGroup.children.length) {
+    const obj = boardGroup.children.pop();
+    obj.material?.dispose();
+  }
+
+  const ownKeys  = ownFleetKeys();
+  const shotKeys = currentShotKeys();
+  const hitKeys  = currentHitKeys(shotKeys);
+
+  for (let z = 0; z < SIZE.z; z++) {
+    for (let y = 0; y < SIZE.y; y++) {
+      for (let x = 0; x < SIZE.x; x++) {
+        const cell = { x, y, z };
+        const k = cellKey(cell);
+        let color = COLORS.water;
+        if (ownKeys.has(k))  color = COLORS.ship;
+        if (shotKeys.has(k)) color = hitKeys.has(k) ? COLORS.hit : COLORS.miss;
+
+        const mat = new THREE.MeshStandardMaterial({
+          color, roughness: 0.62, metalness: 0.12,
+        });
+        const cube = new THREE.Mesh(sharedGeometry, mat);
+        cube.position.set(x - offX, z - offY, y - offZ);
+        cube.userData.cell = cell;
+        boardGroup.add(cube);
+      }
+    }
+  }
+}
+
+function ownFleetKeys() {
+  const fleet =
+    state.phase === "placement" ? state.ships
+    : state.view === "own"      ? state.ships
+    : [];
+  return fleetKeys(fleet);
+}
+
+function currentShotKeys() {
+  if (state.phase !== "game") return new Set();
+  const shots =
+    state.view === "own"
+      ? (state.role === "host" ? state.match.shotsGuest : state.match.shotsHost)
+      : (state.role === "host" ? state.match.shotsHost  : state.match.shotsGuest);
+  return new Set(shots);
+}
+
+function currentHitKeys(shotKeys) {
+  if (state.phase !== "game") return new Set();
+  if (state.view === "own") {
+    const mine = fleetKeys(state.ships);
+    const hits = new Set();
+    shotKeys.forEach((k) => { if (mine.has(k)) hits.add(k); });
+    return hits;
+  }
+  const list = state.role === "host" ? state.match.hitsHost : state.match.hitsGuest;
+  return new Set(list || []);
+}
+
+/* ============================================================
+   PLACEMENT — расстановка
+   ============================================================ */
+function placementStart() {
+  state.ships = [];
+  state.enemyShips = [];
+  state.shipIndex = 0;
+  state.axis = "x";
+  state.shipsSent = false;
+  setStatus("placementStatus", "");
+  syncAxisButtons();
+  updatePlacementInfo();
+}
+
+function setAxis(name) { state.axis = name; syncAxisButtons(); }
+
+function syncAxisButtons() {
+  document.querySelectorAll(".axisButton").forEach((b) => {
+    b.classList.toggle("active", b.dataset.axis === state.axis);
+  });
+}
+
+function placeShip(startCell) {
+  if (state.phase !== "placement") return;
+  if (state.shipIndex >= FLEET.length) return;
+
+  const length = FLEET[state.shipIndex];
+  const cells = cellsFor(startCell, state.axis, length);
+  const used = fleetKeys(state.ships);
+
+  if (cells.some((c) => !isInside(c) || used.has(cellKey(c)))) {
+    setStatus("placementStatus",
+      "Корабль выходит за границы или пересекается с другим.");
+    return;
+  }
+
+  state.ships.push(cells);
+  state.shipIndex++;
+  setStatus("placementStatus", "");
+  updatePlacementInfo();
+  drawBoard();
+}
+
+function updatePlacementInfo() {
+  if (state.shipIndex < FLEET.length) {
+    setStatus("placementInfo",
+      `Разместите корабль длиной ${FLEET[state.shipIndex]} клеток ` +
+      `(${state.shipIndex + 1} из ${FLEET.length}).`);
+    $("finishPlacementButton").disabled = true;
+  } else {
+    setStatus("placementInfo", "Флот размещён. Подтвердите готовность.");
+    $("finishPlacementButton").disabled = false;
+  }
+}
+
+function finishPlacement() {
+  if (state.shipIndex !== FLEET.length || state.shipsSent) return;
+  state.shipsSent = true;
+  $("finishPlacementButton").disabled = true;
+
+  if (state.role === "guest") {
+    send({ type: "SHIPS", ships: state.ships });
+    setStatus("placementStatus",
+      "Флот отправлен. Ожидаем начала игры от хоста.");
+  } else {
+    setStatus("placementStatus",
+      state.enemyShips.length
+        ? "Оба флота готовы."
+        : "Ждём, пока друг расставит и отправит свой флот.");
+  }
+}
+
+/* ============================================================
+   BATTLE — партия
+   ============================================================ */
+function startAsHost() {
+  if (state.phase !== "placement") return;
+  if (state.ships.length      !== FLEET.length) return;
+  if (state.enemyShips.length !== FLEET.length) return;
+
+  resetMatch();
+  send({
+    type: "START",
+    turn: "host",
+    shotsHost: [], shotsGuest: [],
+    hitsHost:  [], hitsGuest:  [],
+  });
+  resetView();
+  showScreen("game");
+  updateGameStatus();
+}
+
+function startAsGuest(msg) {
+  state.match.turn       = msg.turn || "host";
+  state.match.shotsHost  = msg.shotsHost  || [];
+  state.match.shotsGuest = msg.shotsGuest || [];
+  state.match.hitsHost   = msg.hitsHost   || [];
+  state.match.hitsGuest  = msg.hitsGuest  || [];
+  state.match.winner     = null;
+  resetView();
+  showScreen("game");
+  updateGameStatus();
+}
+
+function handleUpdate(msg) {
+  if (!Array.isArray(msg.shotsHost) || !Array.isArray(msg.shotsGuest)) {
+    setStatus("gameStatus", "Повреждённое сообщение от хоста.");
+    return;
+  }
+  state.match.shotsHost  = msg.shotsHost;
+  state.match.shotsGuest = msg.shotsGuest;
+  state.match.hitsHost   = msg.hitsHost   || [];
+  state.match.hitsGuest  = msg.hitsGuest  || [];
+  state.match.turn       = msg.turn;
+  state.match.winner     = msg.winner;
+  state.pendingShot      = false;
+
+  updateGameStatus();
+  if (state.match.winner) showResult(state.match.winner);
+  else drawBoard();
+}
+
+function fireAt(cell) {
+  if (state.phase !== "game" || state.view !== "target") return;
+  if (state.match.winner || state.pendingShot) return;
+  if (state.match.turn !== state.role) return;
+
+  const list = shotList(state.role);
+  const c = cellKey(cell);
+  if (list.includes(c)) return;
+
+  if (state.role === "host") {
+    processShot("host", c);
+  } else {
+    state.pendingShot = true;
+    send({ type: "SHOT", cell: c });
+  }
+}
+
+function processShot(shooter, cell) {
+  if (state.role !== "host") return;
+  if (state.match.winner) return;
+  if (state.match.turn !== shooter) return;
+
+  const c = typeof cell === "string" ? cell : cellKey(cell);
+  const shots = shotList(shooter);
+  if (shots.includes(c)) return;
+
+  shots.push(c);
+  const fleet  = targetFleet(shooter);
+  const fleetK = fleetKeys(fleet);
+  const hits   = shots.filter((s) => fleetK.has(s));
+
+  if (shooter === "host") state.match.hitsHost = hits;
+  else                    state.match.hitsGuest = hits;
+
+  const allSunk = isFleetSunk(fleet, new Set(hits));
+  state.match.winner = allSunk ? shooter : null;
+  state.match.turn   = allSunk ? shooter
+                     : (shooter === "host" ? "guest" : "host");
+
+  send({
+    type: "UPDATE",
+    shotsHost: state.match.shotsHost,
+    shotsGuest: state.match.shotsGuest,
+    hitsHost: state.match.hitsHost,
+    hitsGuest: state.match.hitsGuest,
+    turn: state.match.turn,
+    winner: state.match.winner,
+  });
+
+  updateGameStatus();
+  if (state.match.winner) showResult(state.match.winner);
+  else drawBoard();
+}
+
+function shotList(shooter) {
+  return shooter === "host" ? state.match.shotsHost : state.match.shotsGuest;
+}
+
+function targetFleet(shooter) {
+  return shooter === "host" ? state.enemyShips : state.ships;
+}
+
+function updateGameStatus() {
+  if (state.match.winner) return;
+  setStatus("gameStatus",
+    state.match.turn === state.role ? "Ваш ход." : "Ход соперника.");
+}
+
+function showResult(winner) {
+  setText("resultTitle", winner === state.role ? "Победа!" : "Поражение");
+  setText("resultText",
+    winner === state.role
+      ? "Вы потопили весь флот соперника."
+      : "Соперник потопил весь ваш флот.");
+  showScreen("result");
+}
+
+function resetView() {
+  state.view = "target";
+  state.pendingShot = false;
+  $("targetViewButton").classList.add("active");
+  $("ownViewButton").classList.remove("active");
+}
+
+function switchView(nextView) {
+  state.view = nextView;
+  $("targetViewButton").classList.toggle("active", nextView === "target");
+  $("ownViewButton").classList.toggle("active",    nextView === "own");
+  drawBoard();
+}
+
+/* ============================================================
+   WIRING — связываем всё вместе
+   ============================================================ */
+initScene($("gameCanvas"));
+
+window.addEventListener("screenchange", (e) => {
+  if (e.detail.id === "placement") mountTo("placementCanvasSlot");
+  else if (e.detail.id === "game") mountTo("gameCanvasSlot");
+});
+
+onCellClick((cell) => {
+  if (state.phase === "placement") placeShip(cell);
+  else if (state.phase === "game" && state.view === "target") fireAt(cell);
+});
+
+setHandlers({
+  onOpen: () => {
+    $("goPlacementButton").disabled = false;
+    setConnectionStatus("Соединение установлено. Можно переходить к расстановке.");
+  },
+  onClose: () => setConnectionStatus("Соединение закрыто."),
+  onStatus: setConnectionStatus,
+  onMessage: handleIncoming,
+});
+
+function handleIncoming(msg) {
+  if (state.role === "host" && msg.type === "SHIPS") {
+    if (!isValidFleet(msg.ships)) {
+      setConnectionStatus("Друг прислал некорректную расстановку.");
+      return;
+    }
+    state.enemyShips = msg.ships;
+    startAsHost();
+    return;
+  }
+  if (state.role === "host" && msg.type === "SHOT") {
+    processShot("guest", msg.cell);
+    return;
+  }
+  if (state.role === "guest" && msg.type === "START") {
+    startAsGuest(msg);
+    return;
+  }
+  if (state.role === "guest" && msg.type === "UPDATE") {
+    handleUpdate(msg);
+    return;
+  }
+}
+
+/* ── Меню ── */
+$("hostButton").addEventListener("click", async () => {
+  state.role = "host";
+  $("connectionHelp").textContent =
+    "Отправьте приглашение другу. Когда он вернёт ответ, вставьте его ниже.";
+  $("offerBlock").classList.remove("hidden");
+  $("joinBlock").classList.add("hidden");
+  showScreen("connection");
+
+  try {
+    const code = await createHostOffer();
+    $("offerText").value = code;
+    updateCodeMeta("offerText", "offerMeta");
+    setConnectionStatus("Приглашение готово. Скопируйте и отправьте другу.");
+    $("offerText").focus();
+    $("offerText").select();
+    if (await copyText(code))
+      setConnectionStatus("Приглашение скопировано в буфер обмена. Отправьте другу.");
+  } catch (err) {
+    setConnectionStatus("Не удалось создать приглашение: " + err.message);
+  }
+});
+
+$("joinButton").addEventListener("click", () => {
+  state.role = "guest";
+  openJoinFlow();
+});
+
+function openJoinFlow() {
+  $("connectionHelp").textContent =
+    "Вставьте приглашение хоста. Затем отправьте ему созданный ответ.";
+  $("joinBlock").classList.remove("hidden");
+  $("offerBlock").classList.add("hidden");
+  showScreen("connection");
+}
+
+/* ── Гость: ответ ── */
+$("createAnswerButton").addEventListener("click", async () => {
+  const offerCode = $("joinOfferText").value.trim();
+  if (!offerCode) { setConnectionStatus("Вставьте приглашение хоста."); return; }
+  try {
+    const code = await createGuestAnswer(offerCode);
+    $("generatedAnswerText").value = code;
+    updateCodeMeta("generatedAnswerText", "answerMeta");
+    $("answerBlock").classList.remove("hidden");
+    setConnectionStatus("Ответ готов. Отправьте его хосту.");
+    if (await copyText(code))
+      setConnectionStatus("Ответ скопирован в буфер обмена. Отправьте его хосту.");
+  } catch {
+    setConnectionStatus("Не удалось создать ответ. Проверьте приглашение.");
+  }
+});
+
+/* ── Хост: применить ответ ── */
+$("applyAnswerButton").addEventListener("click", async () => {
+  const answerCode = $("answerText").value.trim();
+  if (!answerCode) { setConnectionStatus("Вставьте ответ друга."); return; }
+  try {
+    await applyAnswer(answerCode);
+    setConnectionStatus("Ответ принят. Подключаемся…");
+  } catch {
+    setConnectionStatus("Не удалось прочитать ответ. Проверьте вставленный текст.");
+  }
+});
+
+/* ── Копирование ── */
+$("copyOfferButton").addEventListener("click", async () => {
+  const ok = await copyText($("offerText").value);
+  setConnectionStatus(ok ? "Код приглашения скопирован." : "Не удалось скопировать.");
+});
+
+$("copyOfferLinkButton").addEventListener("click", async () => {
+  const code = $("offerText").value;
+  if (!code) return;
+  const url = `${location.origin}${location.pathname}?offer=${encodeURIComponent(code)}`;
+  const ok = await copyText(url);
+  setConnectionStatus(ok
+    ? "Ссылка скопирована. Друг откроет её — приглашение подставится автоматически."
+    : "Не удалось скопировать ссылку.");
+});
+
+$("copyAnswerButton").addEventListener("click", async () => {
+  const ok = await copyText($("generatedAnswerText").value);
+  setConnectionStatus(ok ? "Ответ скопирован." : "Не удалось скопировать.");
+});
+
+/* ── Переходы ── */
+$("goPlacementButton").addEventListener("click", () => {
+  if (!isOpen()) { setConnectionStatus("Соединение не установлено."); return; }
+  placementStart();
+  showScreen("placement");
+});
+
+$("restartButton").addEventListener("click", () => location.reload());
+
+/* ── Расстановка ── */
+document.querySelectorAll(".axisButton").forEach((button) => {
+  button.addEventListener("click", () => setAxis(button.dataset.axis));
+});
+
+$("finishPlacementButton").addEventListener("click", () => {
+  finishPlacement();
+  if (state.role === "host") startAsHost();
+});
+
+/* ── Экран партии ── */
+$("targetViewButton").addEventListener("click", () => switchView("target"));
+$("ownViewButton").addEventListener("click",    () => switchView("own"));
+
+/* ── Автоподстановка приглашения из URL ── */
+const offerFromUrl = new URLSearchParams(location.search).get("offer");
+if (offerFromUrl) {
+  state.role = "guest";
+  openJoinFlow();
+  $("joinOfferText").value = offerFromUrl;
+  setConnectionStatus("Приглашение загружено из ссылки. Нажмите «Создать ответ».");
+}
+</script>
+</body>
+</html>
