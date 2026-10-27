@@ -1,6 +1,7 @@
 <!doctype html>
 <html lang="ru">
 <head>
+<<<<<<< Updated upstream
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Глубина — морской бой</title>
@@ -8,9 +9,28 @@
 <script type="importmap">
 {"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js","three/addons/controls/OrbitControls.js":"https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/controls/OrbitControls.js"}}
 </script>
+=======
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Глубина — морской бой</title>
+
+  <link rel="stylesheet" href="style.css" />
+
+  <!-- PeerJS с CDN -->
+  <script src="https://unpkg.com/peerjs@1.5.5/dist/peerjs.min.js"></script>
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+        "three/addons/controls/OrbitControls.js": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/controls/OrbitControls.js"
+      }
+    }
+  </script>
+>>>>>>> Stashed changes
 </head>
 <body>
 <main>
+<<<<<<< Updated upstream
 <h1>Глубина</h1>
 <p>Морской бой в трёх измерениях: 6 × 6 × 4 клетки.</p>
 <section id="menu" class="panel">
@@ -74,11 +94,88 @@
 <p id="resultText"></p>
 <button onclick="location.reload()">В меню</button>
 </section>
+=======
+  <h1>Глубина</h1>
+  <p>Морской бой в трёх измерениях: 6 × 6 × 4 клетки.</p>
+
+  <section id="menu" class="panel">
+    <h2>Новая игра</h2>
+    <div class="button-row">
+      <button id="hostButton">Создать игру</button>
+      <button id="joinButton">Подключиться по ID</button>
+    </div>
+    <p class="muted">Для игры по сети откройте сайт по HTTPS или на localhost.</p>
+  </section>
+
+  <section id="connection" class="panel hidden">
+    <h2>Подключение</h2>
+    <p id="connectionHelp"></p>
+
+    <!-- Блок для хоста -->
+    <div id="hostBlock" class="hidden">
+      <label>Ваш ID для приглашения друга:</label>
+      <input type="text" id="peerIdDisplay" readonly style="width:100%; padding:10px; margin-bottom:10px; font-size:1.2rem; text-align:center;" />
+      <div class="button-row">
+        <button id="copyIdButton">Скопировать ID</button>
+      </div>
+      <p id="hostWaitStatus" class="status">Ожидание подключения друга...</p>
+    </div>
+
+    <!-- Блок для гостя -->
+    <div id="guestBlock" class="hidden">
+      <label for="joinIdInput">Введите ID хоста:</label>
+      <input type="text" id="joinIdInput" placeholder="Например: a1b2c3d4" style="width:100%; padding:10px; margin-bottom:10px;" />
+      <button id="connectButton">Подключиться</button>
+      <p id="guestStatus" class="status"></p>
+    </div>
+
+    <p id="connectionStatus" class="status">Ожидание подключения…</p>
+    <div class="button-row">
+      <button id="goPlacementButton" disabled>Перейти к расстановке</button>
+      <button id="backToMenuButton">← Назад в меню</button>
+    </div>
+  </section>
+
+  <section id="placement" class="panel hidden">
+    <h2>Расстановка флота</h2>
+    <p id="placementInfo"></p>
+    <p class="muted">Выберите ось и нажмите на клетку, где начнётся корабль. Перетаскивайте мышью, чтобы вращать поле.</p>
+    <div class="button-row">
+      <button class="axisButton active" data-axis="x">Ось X</button>
+      <button class="axisButton" data-axis="y">Ось Y</button>
+      <button class="axisButton" data-axis="z">Ось Z</button>
+    </div>
+    <div style="height:12px"></div>
+    <div id="placementCanvasSlot">
+      <canvas id="gameCanvas"></canvas>
+    </div>
+    <p id="placementStatus" class="status"></p>
+    <button id="finishPlacementButton" disabled>Готово</button>
+  </section>
+
+  <section id="game" class="panel hidden">
+    <h2>Партия</h2>
+    <p id="gameStatus" class="status"></p>
+    <div class="button-row">
+      <button id="targetViewButton" class="active">Цель</button>
+      <button id="ownViewButton">Мой флот</button>
+    </div>
+    <p class="muted">В режиме «Цель» нажмите клетку, чтобы выстрелить.</p>
+    <div id="gameCanvasSlot"></div>
+  </section>
+
+  <section id="result" class="panel hidden">
+    <h2 id="resultTitle">Игра окончена</h2>
+    <p id="resultText"></p>
+    <button onclick="location.reload()">В меню</button>
+  </section>
+>>>>>>> Stashed changes
 </main>
 <script type="module">
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 
+<<<<<<< Updated upstream
 const S={x:6,y:6,z:4},F=[4,3,3,2,2],IC=[{urls:"stun:stun.l.google.com:19302"}],Q=i=>document.getElementById(i),SC=["menu","connection","placement","game","result"],CV=Q("gameCanvas");
 let R=null,PC=null,CH=null,SH=[],ES=[],SI=0,AX="x",V="target",PH="menu",PS=false,SS=false;
 const M={sh:[],sg:[],hh:[],hg:[],t:"host",w:null};
@@ -92,14 +189,69 @@ function SV(id){
   }else if(id==="game"){
     Q("gameCanvasSlot").appendChild(CV);
     requestAnimationFrame(()=>{RR();DB()});
+=======
+  const SIZE = { x: 6, y: 6, z: 4 };
+  const FLEET = [4, 3, 3, 2, 2];
+
+  const $ = (id) => document.getElementById(id);
+  const screens = ["menu", "connection", "placement", "game", "result"];
+
+  const canvas = $("gameCanvas");
+
+  // --- Состояние игры ---
+  let role = null; // 'host' | 'guest'
+  let peer = null;
+  let conn = null;
+  let ships = [];
+  let enemyShips = [];
+  let shipIndex = 0;
+  let axis = "x";
+  let view = "target";
+  let phase = "menu";
+  let pendingShot = false;
+  let shipsSent = false;
+
+  const match = {
+    shotsHost: [],
+    shotsGuest: [],
+    hitsHost: [],
+    hitsGuest: [],
+    turn: "host",
+    winner: null
+  };
+
+  // --- Управление экранами ---
+  function showScreen(id) {
+    screens.forEach((name) => $(name).classList.toggle("hidden", name !== id));
+    phase = id;
+
+    if (id === "placement") {
+      $("placementCanvasSlot").appendChild(canvas);
+      requestAnimationFrame(() => {
+        resizeRenderer();
+        drawBoard();
+      });
+    } else if (id === "game") {
+      $("gameCanvasSlot").appendChild(canvas);
+      requestAnimationFrame(() => {
+        resizeRenderer();
+        drawBoard();
+      });
+    }
+>>>>>>> Stashed changes
   }
 }
 
+<<<<<<< Updated upstream
 function K(c){return`${c.x},${c.y},${c.z}`}
 function I(c){return c.x>=0&&c.x<S.x&&c.y>=0&&c.y<S.y&&c.z>=0&&c.z<S.z}
 function CF(s,d,l){return Array.from({length:l},(_,i)=>{const c={...s};c[d]+=i;return c})}
 function AOK(){return new Set(SH.flatMap(s=>s.map(K)))}
 function STS(t){Q("connectionStatus").textContent=t}
+=======
+  // --- Утилиты для работы с клетками ---
+  function key(c) { return `${c.x},${c.y},${c.z}`; }
+>>>>>>> Stashed changes
 
 function WIG(p){
   if(p.iceGatheringState==="complete")return Promise.resolve();
@@ -218,6 +370,7 @@ function PL(s){
   UPI()
 }
 
+<<<<<<< Updated upstream
 function FP(){
   if(SI!==F.length||SS)return;
   SS=true;
@@ -228,9 +381,45 @@ function FP(){
   }else{
     Q("placementStatus").textContent=ES.length?"Оба флота готовы.":"Ждём, пока друг расставит и отправит свой флот.";
     MSG()
+=======
+  // --- Логика PeerJS ---
+
+  // Создание игры (Хост)
+  function createHostGame() {
+    role = "host";
+    $("hostBlock").classList.remove("hidden");
+    $("guestBlock").classList.add("hidden");
+    showScreen("connection");
+    $("connectionHelp").textContent = "Отправьте ваш ID другу. Когда он подключится, игра начнется автоматически.";
+    $("goPlacementButton").disabled = true;
+    $("peerIdDisplay").value = "";
+    $("hostWaitStatus").textContent = "Ожидание подключения друга...";
+
+    peer = new Peer(null, { debug: 2 });
+
+    peer.on('open', (id) => {
+      $("peerIdDisplay").value = id;
+      $("hostWaitStatus").textContent = "Ожидание подключения друга...";
+      setStatus("ID готов. Скопируйте его и отправьте другу.");
+    });
+
+    peer.on('connection', (connection) => {
+      conn = connection;
+      setupConnection(conn);
+      $("hostWaitStatus").textContent = "Друг подключился!";
+      setStatus("Соединение установлено. Можно переходить к расстановке.");
+      $("goPlacementButton").disabled = false;
+    });
+
+    peer.on('error', (err) => {
+      console.error(err);
+      setStatus("Ошибка соединения: " + err.type);
+    });
+>>>>>>> Stashed changes
   }
 }
 
+<<<<<<< Updated upstream
 function RV(){
   V="target";PS=false;
   Q("targetViewButton").classList.add("active");
@@ -260,9 +449,108 @@ function RM(m){
     M.sh=m.shotsHost;M.sg=m.shotsGuest;M.hh=m.hitsHost||[];M.hg=m.hitsGuest||[];M.t=m.turn;M.w=m.winner;
     PS=false;UGS();
     if(M.w)SR(M.w);else DB()
+=======
+  // Подключение по ID (Гость)
+  function joinGame() {
+    role = "guest";
+    $("guestBlock").classList.remove("hidden");
+    $("hostBlock").classList.add("hidden");
+    showScreen("connection");
+    $("connectionHelp").textContent = "Введите ID, который прислал хост.";
+    $("goPlacementButton").disabled = true;
+    $("guestStatus").textContent = "";
+    $("connectionStatus").textContent = "Ожидание подключения…";
+
+    // onclick, чтобы не плодить обработчики при повторных заходах
+    $("connectButton").onclick = () => {
+      const hostId = $("joinIdInput").value.trim();
+      if (!hostId) {
+        $("guestStatus").textContent = "Пожалуйста, введите ID.";
+        return;
+      }
+
+      $("guestStatus").textContent = "Подключение...";
+      peer = new Peer();
+
+      peer.on('open', () => {
+        conn = peer.connect(hostId);
+        setupConnection(conn);
+      });
+
+      peer.on('error', (err) => {
+        console.error(err);
+        $("guestStatus").textContent = "Ошибка подключения: " + err.type;
+      });
+    };
+  }
+
+  // Возврат в меню с очисткой соединения
+  function backToMenu() {
+    if (conn) {
+      try { conn.close(); } catch {}
+      conn = null;
+    }
+    if (peer) {
+      try { peer.destroy(); } catch {}
+      peer = null;
+    }
+    role = null;
+
+    // Сбрасываем состояние UI
+    $("peerIdDisplay").value = "";
+    $("joinIdInput").value = "";
+    $("hostWaitStatus").textContent = "";
+    $("guestStatus").textContent = "";
+    $("connectionStatus").textContent = "Ожидание подключения…";
+    $("goPlacementButton").disabled = true;
+    $("hostBlock").classList.add("hidden");
+    $("guestBlock").classList.add("hidden");
+
+    showScreen("menu");
+  }
+
+  // Настройка общих обработчиков для соединения
+  function setupConnection(connection) {
+    connection.on('open', () => {
+      setStatus("Соединение установлено. Можно переходить к расстановке.");
+      $("goPlacementButton").disabled = false;
+      if (role === 'host') {
+        $("hostWaitStatus").textContent = "Друг подключился!";
+      } else {
+        $("guestStatus").textContent = "Соединение установлено.";
+      }
+    });
+
+    connection.on('data', (data) => {
+      try {
+        receiveMessage(data);
+      } catch (e) {
+        console.error("Ошибка при обработке сообщения:", e);
+        setStatus("Получено некорректное сообщение.");
+      }
+    });
+
+    connection.on('close', () => {
+      setStatus("Соединение закрыто.");
+      $("goPlacementButton").disabled = true;
+    });
+
+    connection.on('error', (err) => {
+      console.error(err);
+      setStatus("Ошибка канала связи.");
+    });
+  }
+
+  // Отправка сообщения
+  function send(message) {
+    if (conn && conn.open) {
+      conn.send(message);
+    }
+>>>>>>> Stashed changes
   }
 }
 
+<<<<<<< Updated upstream
 function SL(s){return s==="host"?M.sh:M.sg}
 function TF(s){return s==="host"?ES:SH}
 
@@ -373,6 +661,311 @@ function DB(){
         cu.position.set(x-2.5,z-1.5,y-2.5);
         cu.userData.cell=c;
         BG.add(cu)
+=======
+  // --- Игровая логика ---
+
+  function startPlacement() {
+    if (!conn || !conn.open) return;
+    ships = [];
+    enemyShips = [];
+    shipIndex = 0;
+    axis = "x";
+    shipsSent = false;
+    $("placementStatus").textContent = "";
+    document.querySelectorAll(".axisButton").forEach((b) => {
+      b.classList.toggle("active", b.dataset.axis === "x");
+    });
+    updatePlacementInfo();
+    showScreen("placement");
+  }
+
+  function updatePlacementInfo() {
+    if (shipIndex < FLEET.length) {
+      $("placementInfo").textContent =
+        `Разместите корабль длиной ${FLEET[shipIndex]} клеток (${shipIndex + 1} из ${FLEET.length}).`;
+      $("finishPlacementButton").disabled = true;
+    } else {
+      $("placementInfo").textContent = "Флот размещён. Подтвердите готовность.";
+      $("finishPlacementButton").disabled = false;
+    }
+    drawBoard();
+  }
+
+  function placeShip(start) {
+    if (shipIndex >= FLEET.length) return;
+
+    const length = FLEET[shipIndex];
+    const cells = cellsFor(start, axis, length);
+    const used = allOwnKeys();
+
+    if (cells.some((c) => !inside(c) || used.has(key(c)))) {
+      $("placementStatus").textContent = "Корабль выходит за границы или пересекается с другим.";
+      return;
+    }
+
+    ships.push(cells);
+    shipIndex++;
+    $("placementStatus").textContent = "";
+    updatePlacementInfo();
+  }
+
+  function finishPlacement() {
+    if (shipIndex !== FLEET.length || shipsSent) return;
+    shipsSent = true;
+    $("finishPlacementButton").disabled = true;
+
+    if (role === "guest") {
+      send({ type: "SHIPS", ships });
+      $("placementStatus").textContent = "Флот отправлен. Ожидаем начала игры от хоста.";
+    } else {
+      $("placementStatus").textContent = enemyShips.length
+        ? "Оба флота готовы."
+        : "Ждём, пока друг расставит и отправит свой флот.";
+      maybeStartGame();
+    }
+  }
+
+  function resetView() {
+    view = "target";
+    pendingShot = false;
+    $("targetViewButton").classList.add("active");
+    $("ownViewButton").classList.remove("active");
+  }
+
+  function maybeStartGame() {
+    if (role !== "host") return;
+    if (phase !== "placement") return;
+    if (ships.length !== FLEET.length || enemyShips.length !== FLEET.length) return;
+
+    match.shotsHost = [];
+    match.shotsGuest = [];
+    match.hitsHost = [];
+    match.hitsGuest = [];
+    match.turn = "host";
+    match.winner = null;
+
+    send({
+      type: "START",
+      turn: match.turn,
+      shotsHost: [],
+      shotsGuest: [],
+      hitsHost: [],
+      hitsGuest: []
+    });
+
+    resetView();
+    updateGameStatus();
+    showScreen("game");
+  }
+
+  function receiveMessage(message) {
+    if (role === "host" && message.type === "SHIPS") {
+      if (!Array.isArray(message.ships) || message.ships.length !== FLEET.length) {
+        setStatus("Друг прислал некорректную расстановку.");
+        return;
+      }
+      enemyShips = message.ships;
+      maybeStartGame();
+      return;
+    }
+
+    if (role === "host" && message.type === "SHOT") {
+      processShot("guest", message.cell);
+      return;
+    }
+
+    if (role === "guest" && message.type === "START") {
+      match.turn = message.turn;
+      match.shotsHost = message.shotsHost || [];
+      match.shotsGuest = message.shotsGuest || [];
+      match.hitsHost = message.hitsHost || [];
+      match.hitsGuest = message.hitsGuest || [];
+      match.winner = null;
+      resetView();
+      updateGameStatus();
+      showScreen("game");
+      return;
+    }
+
+    if (role === "guest" && message.type === "UPDATE") {
+      match.shotsHost = message.shotsHost;
+      match.shotsGuest = message.shotsGuest;
+      match.hitsHost = message.hitsHost || [];
+      match.hitsGuest = message.hitsGuest || [];
+      match.turn = message.turn;
+      match.winner = message.winner;
+      pendingShot = false;
+      updateGameStatus();
+      if (match.winner) showResult(match.winner);
+      else drawBoard();
+    }
+  }
+
+  function shotList(shooter) {
+    return shooter === "host" ? match.shotsHost : match.shotsGuest;
+  }
+
+  function targetFleet(shooter) {
+    return shooter === "host" ? enemyShips : ships;
+  }
+
+  function processShot(shooter, cell) {
+    if (role !== "host" || match.winner || match.turn !== shooter) return;
+
+    const c = typeof cell === "string" ? cell : key(cell);
+    const shots = shotList(shooter);
+    if (shots.includes(c)) return;
+
+    shots.push(c);
+    const fleet = targetFleet(shooter);
+    const fleetKeys = new Set(fleet.flatMap((ship) => ship.map(key)));
+    const hits = shots.filter((shot) => fleetKeys.has(shot));
+
+    if (shooter === "host") match.hitsHost = hits;
+    else match.hitsGuest = hits;
+
+    const allSunk = fleet.every((ship) => ship.every((part) => hits.includes(key(part))));
+    match.winner = allSunk ? shooter : null;
+    match.turn = allSunk ? shooter : (shooter === "host" ? "guest" : "host");
+
+    send({
+      type: "UPDATE",
+      shotsHost: match.shotsHost,
+      shotsGuest: match.shotsGuest,
+      hitsHost: match.hitsHost,
+      hitsGuest: match.hitsGuest,
+      turn: match.turn,
+      winner: match.winner
+    });
+
+    updateGameStatus();
+    if (match.winner) showResult(match.winner);
+    else drawBoard();
+  }
+
+  function fireAt(cell) {
+    if (phase !== "game" || view !== "target" || match.winner || pendingShot) return;
+    if (match.turn !== role) return;
+
+    const list = shotList(role);
+    const c = key(cell);
+    if (list.includes(c)) return;
+
+    if (role === "host") {
+      processShot("host", c);
+    } else {
+      pendingShot = true;
+      send({ type: "SHOT", cell: c });
+    }
+  }
+
+  function updateGameStatus() {
+    if (match.winner) return;
+    const turnName = match.turn === role ? "Ваш ход." : "Ход соперника.";
+    $("gameStatus").textContent = turnName;
+  }
+
+  function showResult(winner) {
+    $("resultTitle").textContent = winner === role ? "Победа!" : "Поражение";
+    $("resultText").textContent = winner === role
+      ? "Вы потопили весь флот соперника."
+      : "Соперник потопил весь ваш флот.";
+    showScreen("result");
+  }
+
+  // --- Three.js ---
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setClearColor(0x081b28);
+
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(42, 1, 0.1, 100);
+  camera.position.set(9, 10, 11);
+
+  const controls = new OrbitControls(camera, renderer.domElement);
+  controls.enableDamping = true;
+  controls.target.set(0, 0, 0);
+
+  scene.add(new THREE.HemisphereLight(0xc6f2ff, 0x142431, 2));
+  const light = new THREE.DirectionalLight(0xffffff, 2.2);
+  light.position.set(5, 9, 7);
+  scene.add(light);
+
+  const boardGroup = new THREE.Group();
+  scene.add(boardGroup);
+
+  const raycaster = new THREE.Raycaster();
+  const pointer = new THREE.Vector2();
+
+  function resizeRenderer() {
+    const rect = canvas.getBoundingClientRect();
+    if (!rect.width || !rect.height) return;
+    renderer.setSize(rect.width, rect.height, false);
+    camera.aspect = rect.width / rect.height;
+    camera.updateProjectionMatrix();
+  }
+
+  function currentShotsOnBoard() {
+    if (view === "own") {
+      return role === "host" ? match.shotsGuest : match.shotsHost;
+    }
+    return role === "host" ? match.shotsHost : match.shotsGuest;
+  }
+
+  function ownFleetForView() {
+    if (phase === "placement") return ships;
+    return view === "own" ? ships : [];
+  }
+
+  function currentHitKeys(shotKeys) {
+    const hitKeys = new Set();
+    if (phase !== "game") return hitKeys;
+
+    if (view === "own") {
+      const myKeys = new Set(ships.flatMap((ship) => ship.map(key)));
+      shotKeys.forEach((k) => { if (myKeys.has(k)) hitKeys.add(k); });
+    } else {
+      const hits = role === "host" ? match.hitsHost : match.hitsGuest;
+      (hits || []).forEach((k) => hitKeys.add(k));
+    }
+    return hitKeys;
+  }
+
+  function drawBoard() {
+    if (phase !== "placement" && phase !== "game") return;
+
+    while (boardGroup.children.length) {
+      const object = boardGroup.children.pop();
+      object.geometry?.dispose();
+      if (object.material) object.material.dispose();
+    }
+
+    const ownKeys = new Set(ownFleetForView().flatMap((ship) => ship.map(key)));
+    const shotKeys = new Set(currentShotsOnBoard());
+    const hitKeys = currentHitKeys(shotKeys);
+
+    for (let z = 0; z < SIZE.z; z++) {
+      for (let y = 0; y < SIZE.y; y++) {
+        for (let x = 0; x < SIZE.x; x++) {
+          const cell = { x, y, z };
+          const k = key(cell);
+          let color = 0x17445b;
+
+          if (ownKeys.has(k)) color = 0x28a58e;
+          if (shotKeys.has(k)) color = hitKeys.has(k) ? 0xe75b55 : 0xa9bdc6;
+
+          const geometry = new THREE.BoxGeometry(0.88, 0.88, 0.88);
+          const material = new THREE.MeshStandardMaterial({
+            color,
+            roughness: 0.62,
+            metalness: 0.12
+          });
+          const cube = new THREE.Mesh(geometry, material);
+          cube.position.set(x - 2.5, z - 1.5, y - 2.5);
+          cube.userData.cell = cell;
+          boardGroup.add(cube);
+        }
+>>>>>>> Stashed changes
       }
     }
   }
@@ -417,6 +1010,7 @@ Q("copyAnswerButton").addEventListener("click",async()=>{
   STS("Ответ скопирован.")
 });
 
+<<<<<<< Updated upstream
 document.querySelectorAll(".axisButton").forEach(b=>{
   b.addEventListener("click",()=>{
     AX=b.dataset.axis;
@@ -438,6 +1032,49 @@ Q("ownViewButton").addEventListener("click",()=>{
   Q("targetViewButton").classList.remove("active");
   DB()
 });
+=======
+  // --- Обработчики кнопок ---
+  $("hostButton").addEventListener("click", createHostGame);
+  $("joinButton").addEventListener("click", joinGame);
+  $("backToMenuButton").addEventListener("click", backToMenu);
+  $("goPlacementButton").addEventListener("click", startPlacement);
+  $("finishPlacementButton").addEventListener("click", finishPlacement);
+
+  $("copyIdButton").addEventListener("click", async () => {
+    const idText = $("peerIdDisplay").value;
+    if (!idText) return;
+    try {
+      await navigator.clipboard.writeText(idText);
+      setStatus("ID скопирован.");
+    } catch {
+      $("peerIdDisplay").select();
+      document.execCommand('copy');
+      setStatus("ID скопирован (резервный метод).");
+    }
+  });
+
+  document.querySelectorAll(".axisButton").forEach((button) => {
+    button.addEventListener("click", () => {
+      axis = button.dataset.axis;
+      document.querySelectorAll(".axisButton").forEach((b) => b.classList.remove("active"));
+      button.classList.add("active");
+    });
+  });
+
+  $("targetViewButton").addEventListener("click", () => {
+    view = "target";
+    $("targetViewButton").classList.add("active");
+    $("ownViewButton").classList.remove("active");
+    drawBoard();
+  });
+
+  $("ownViewButton").addEventListener("click", () => {
+    view = "own";
+    $("ownViewButton").classList.add("active");
+    $("targetViewButton").classList.remove("active");
+    drawBoard();
+  });
+>>>>>>> Stashed changes
 </script>
 </body>
 </html>
