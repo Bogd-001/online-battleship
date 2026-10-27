@@ -16,7 +16,6 @@
     }
   </script>
 
-  <!-- LZ-string для сжатия кода приглашения/ответа -->
   <script src="https://cdn.jsdelivr.net/npm/lz-string@1.5.0/libs/lz-string.min.js"></script>
 </head>
 
@@ -34,8 +33,8 @@
       <button id="joinButton">Подключиться по приглашению</button>
     </div>
     <p class="muted">
-      Оба игрока должны открыть сайт по HTTPS или на localhost.
-      Соединение устанавливается напрямую через WebRTC — без сервера.
+      Соединение устанавливается напрямую через WebRTC — без сигнального сервера.
+      Обмен приглашением идёт через ссылку, которую вы отправляете друг другу.
     </p>
   </section>
 
@@ -45,44 +44,47 @@
 
     <div id="offerBlock" class="hidden">
       <ol class="steps">
-        <li>Скопируйте приглашение и отправьте другу.</li>
-        <li>Друг пришлёт ответ — вставьте его в поле ниже.</li>
-        <li>Нажмите «Подключить ответ».</li>
+        <li><strong>Скопируйте ссылку</strong> и отправьте другу (мессенджер, почта).</li>
+        <li>Друг откроет её, нажмёт «Создать ответ» и пришлёт вам <strong>ответную ссылку</strong>.</li>
+        <li>Откройте ответную ссылку в <strong>этой же вкладке</strong> (вставьте в адресную строку) — соединение установится автоматически.</li>
       </ol>
 
-      <label for="offerText">Приглашение</label>
+      <label for="offerText">Приглашение (код)</label>
       <textarea id="offerText" readonly></textarea>
       <p id="offerMeta" class="muted code-meta"></p>
       <div class="button-row">
+        <button id="copyOfferLinkButton" class="primary">Скопировать ссылку</button>
         <button id="copyOfferButton">Скопировать код</button>
-        <button id="copyOfferLinkButton">Скопировать ссылку</button>
       </div>
 
-      <label for="answerText">Ответ друга</label>
-      <textarea id="answerText" placeholder="Вставьте сюда текст ответа"></textarea>
+      <label for="answerText">Ответ друга (ссылка или код)</label>
+      <textarea id="answerText" placeholder="Вставьте ответную ссылку или код целиком"></textarea>
       <div class="button-row">
+        <button id="pasteAnswerButton">Вставить из буфера</button>
         <button id="applyAnswerButton" class="primary">Подключить ответ</button>
       </div>
     </div>
 
     <div id="joinBlock" class="hidden">
       <ol class="steps">
-        <li>Вставьте приглашение хоста.</li>
+        <li>Вставьте приглашение хоста (ссылку или код).</li>
         <li>Нажмите «Создать ответ».</li>
-        <li>Отправьте полученный ответ хосту.</li>
+        <li>Отправьте хосту <strong>ответную ссылку</strong>.</li>
       </ol>
 
       <label for="joinOfferText">Приглашение хоста</label>
-      <textarea id="joinOfferText" placeholder="Вставьте сюда приглашение"></textarea>
+      <textarea id="joinOfferText" placeholder="Вставьте приглашение — ссылку или код"></textarea>
       <div class="button-row">
+        <button id="pasteOfferButton">Вставить из буфера</button>
         <button id="createAnswerButton" class="primary">Создать ответ</button>
       </div>
 
       <div id="answerBlock" class="hidden">
-        <label for="generatedAnswerText">Ответ для хоста</label>
+        <label for="generatedAnswerText">Ответ для хоста (код)</label>
         <textarea id="generatedAnswerText" readonly></textarea>
         <p id="answerMeta" class="muted code-meta"></p>
         <div class="button-row">
+          <button id="copyAnswerLinkButton" class="primary">Скопировать ссылку</button>
           <button id="copyAnswerButton">Скопировать код</button>
         </div>
       </div>
@@ -132,38 +134,25 @@
   </section>
 
   <footer class="muted">
-    <p>Three.js + WebRTC. Работает без сервера, только статические файлы.</p>
+    <p>Three.js + WebRTC. Работает без сигнального сервера.</p>
   </footer>
 </main>
 
 <script type="module">
-/* ============================================================
-   ИМПОРТЫ
-   ============================================================ */
+/* ═══════════ ИМПОРТЫ ═══════════ */
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 
-/* ============================================================
-   CONFIG — все «магические числа» и настройки
-   ============================================================ */
+/* ═══════════ CONFIG ═══════════ */
 const SIZE = { x: 6, y: 6, z: 4 };
 const FLEET = [4, 3, 3, 2, 2];
 
-// STUN + публичный TURN-ретранслятор.
-// TURN нужен, если провайдер/роутер блокирует прямой обмен (симметричный NAT,
-// CGNAT в мобильных сетях, корпоративный firewall и т.п.).
+// Только STUN — discovery-протокол. Без TURN.
+// Если провайдер блокирует Google STUN, замените на свой или уберите
+// (тогда соединение будет работать только в локальной сети).
 const ICE_SERVERS = [
   { urls: "stun:stun.l.google.com:19302" },
   { urls: "stun:stun1.l.google.com:19302" },
-  {
-    urls: [
-      "turn:openrelay.metered.ca:80",
-      "turn:openrelay.metered.ca:443",
-      "turn:openrelay.metered.ca:443?transport=tcp",
-    ],
-    username: "openrelayproject",
-    credential: "openrelayproject",
-  },
 ];
 
 const ICE_GATHER_TIMEOUT_MS = 15000;
@@ -184,27 +173,21 @@ const SCENE_CFG = {
   hemiIntensity: 2,
 };
 
-/* ============================================================
-   STATE — единое изменяемое состояние
-   ============================================================ */
+/* ═══════════ STATE ═══════════ */
 const state = {
   role: null,
   phase: "menu",
   view: "target",
   axis: "x",
-
   ships: [],
   enemyShips: [],
   shipIndex: 0,
   shipsSent: false,
-
   pendingShot: false,
-
   match: {
     shotsHost: [], shotsGuest: [],
     hitsHost:  [], hitsGuest:  [],
-    turn: "host",
-    winner: null,
+    turn: "host", winner: null,
   },
 };
 
@@ -216,9 +199,7 @@ function resetMatch() {
   };
 }
 
-/* ============================================================
-   UTILS — чистые функции
-   ============================================================ */
+/* ═══════════ UTILS ═══════════ */
 const cellKey = (c) => `${c.x},${c.y},${c.z}`;
 
 function isInside(c) {
@@ -261,9 +242,7 @@ function isValidFleet(fleet) {
   return true;
 }
 
-/* ============================================================
-   UI — DOM, экраны, копирование
-   ============================================================ */
+/* ═══════════ UI ═══════════ */
 const $ = (id) => document.getElementById(id);
 const SCREENS = ["menu", "connection", "placement", "game", "result"];
 
@@ -284,7 +263,7 @@ async function copyText(text) {
       await navigator.clipboard.writeText(text);
       return true;
     }
-  } catch { /* fallback ниже */ }
+  } catch { /* fallback */ }
   try {
     const ta = document.createElement("textarea");
     ta.value = text;
@@ -298,14 +277,129 @@ async function copyText(text) {
   } catch { return false; }
 }
 
+async function readClipboard() {
+  try {
+    if (navigator.clipboard?.readText) {
+      return await navigator.clipboard.readText();
+    }
+  } catch { /* fallback ниже */ }
+  return null;
+}
+
 function updateCodeMeta(textareaId, metaId) {
   const v = $(textareaId)?.value || "";
   setText(metaId, `Длина кода: ${v.length} символов`);
 }
 
-/* ============================================================
-   WEBRTC — обмен SDP + сжатие LZ + диагностика ICE
-   ============================================================ */
+/* Извлекает код из URL или возвращает входную строку как есть. */
+function extractCode(input) {
+  if (!input) return "";
+  const trimmed = input.trim();
+  if (!/^https?:\/\//i.test(trimmed)) return trimmed;
+  try {
+    const url = new URL(trimmed);
+    const hash = url.hash.slice(1); // без #
+    if (hash) {
+      const sp = new URLSearchParams(hash);
+      const answer = sp.get("answer");
+      const offer  = sp.get("offer");
+      if (answer) return answer;
+      if (offer)  return offer;
+    }
+    const sp = url.searchParams;
+    return sp.get("answer") || sp.get("offer") || trimmed;
+  } catch {
+    return trimmed;
+  }
+}
+
+/* ═══════════ WEBRTC: кодирование с проверкой ═══════════ */
+
+// djb2-хэш → base36, ~7 символов. Ловит обрезание, не криптография.
+function checksum(str) {
+  let h = 5381;
+  for (let i = 0; i < str.length; i++) {
+    h = ((h << 5) + h + str.charCodeAt(i)) | 0;
+  }
+  return (h >>> 0).toString(36);
+}
+
+// Удаляем всё, что могло попасть при копировании: BOM, zero-width,
+// NBSP, пробелы, переносы. Код LZ/B64 не содержит этих символов.
+function sanitizeCode(code) {
+  return String(code || "")
+    .replace(/[\u200B-\u200F\u2060\uFEFF\u00AD]/g, "")
+    .replace(/[\s\u00A0\u1680\u2000-\u200A\u2028\u2029\u202F\u205F\u3000]+/g, "");
+}
+
+function b64Encode(str) {
+  const bytes = new TextEncoder().encode(str);
+  let bin = "";
+  for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+  return btoa(bin);
+}
+function b64Decode(b64) {
+  const bin = atob(b64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return new TextDecoder().decode(bytes);
+}
+
+function encodeCode(desc) {
+  const json = JSON.stringify(desc);
+  const chk = checksum(json);
+  if (typeof LZString !== "undefined") {
+    try {
+      const compressed = LZString.compressToEncodedURIComponent(json);
+      if (compressed && compressed.length < json.length) {
+        return `LZ:${chk}:${compressed}`;
+      }
+    } catch { /* fallback */ }
+  }
+  return `B64:${chk}:${b64Encode(json)}`;
+}
+
+function decodeCode(rawCode) {
+  const code = sanitizeCode(rawCode);
+  if (!code) throw new Error("Код пустой");
+
+  // Новый формат: PREFIX:CHECKSUM:PAYLOAD
+  const m = code.match(/^(LZ|B64):([a-z0-9]+):(.+)$/);
+  if (m) {
+    const [, algo, expectedChk, payload] = m;
+    let json;
+    if (algo === "LZ") {
+      if (typeof LZString === "undefined")
+        throw new Error("LZ-String не загружен — обновите страницу (F5).");
+      json = LZString.decompressFromEncodedURIComponent(payload);
+    } else {
+      json = b64Decode(payload);
+    }
+    if (!json) throw new Error("Не удалось распаковать код");
+    if (checksum(json) !== expectedChk)
+      throw new Error(
+        "Контрольная сумма не совпадает — код скопирован не полностью. " +
+        "Скопируйте его целиком (кнопка «Скопировать код»)."
+      );
+    return JSON.parse(json);
+  }
+
+  // Старый формат (без префикса)
+  if (typeof LZString !== "undefined") {
+    try {
+      const d = LZString.decompressFromEncodedURIComponent(code);
+      if (d) return JSON.parse(d);
+    } catch {}
+  }
+  try { return JSON.parse(b64Decode(code)); } catch {}
+  try { return JSON.parse(code); } catch {}
+  throw new Error(
+    "Неизвестный формат кода. Похоже, скопировано не всё — " +
+    "нажмите «Скопировать код» на стороне отправителя."
+  );
+}
+
+/* ═══════════ WEBRTC: соединение ═══════════ */
 let pc = null;
 let channel = null;
 const rtHandlers = {
@@ -343,8 +437,9 @@ function watchFailure(peer) {
     console.info("[WebRTC] connectionState:", s);
     if (s === "failed") {
       rtHandlers.onStatus(
-        "Соединение не установлено. Проверьте, что TURN-сервер доступен " +
-        "(в Chrome: chrome://webrtc-internals → candidatePairs)."
+        "Соединение не установлено. Возможные причины: " +
+        "STUN-сервер недоступен, строгий NAT, файрвол. " +
+        "Попробуйте нажать «Начать заново»."
       );
     }
   };
@@ -362,55 +457,15 @@ function waitIce(peer) {
   });
 }
 
-/* Считает типы ICE-кандидатов в SDP. Если relay = 0 — TURN не работает. */
-function countCandidates(desc) {
+function logIceSummary(desc, who) {
   const sdp = desc?.sdp || "";
   const count = (typ) =>
     (sdp.match(new RegExp(`a=candidate:[^\\r\\n]*typ ${typ}`, "g")) || []).length;
-  return { host: count("host"), srflx: count("srflx"), relay: count("relay") };
-}
-
-function logIceSummary(desc, who) {
-  const c = countCandidates(desc);
+  const c = { host: count("host"), srflx: count("srflx"), relay: count("relay") };
   console.info(`[WebRTC ${who}] ICE candidates:`, c);
-  if (c.relay === 0) {
-    console.warn(
-      `[WebRTC ${who}] TURN недоступен (relay = 0). ` +
-      `В сетях с симметричным NAT соединение может не установиться. ` +
-      `Проверьте доступ к openrelay.metered.ca.`
-    );
+  if (c.host === 0 && c.srflx === 0) {
+    console.warn(`[WebRTC ${who}] Нет ни одного ICE-кандидата — проверьте сеть.`);
   }
-  return c;
-}
-
-function b64Encode(str) {
-  const bytes = new TextEncoder().encode(str);
-  let bin = "";
-  for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
-  return btoa(bin);
-}
-function b64Decode(b64) {
-  const bin = atob(b64);
-  const bytes = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-  return new TextDecoder().decode(bytes);
-}
-
-function encodeCode(desc) {
-  const json = JSON.stringify(desc);
-  if (typeof LZString !== "undefined")
-    return LZString.compressToEncodedURIComponent(json);
-  return b64Encode(json);
-}
-
-function decodeCode(code) {
-  code = code.trim();
-  if (typeof LZString !== "undefined") {
-    const d = LZString.decompressFromEncodedURIComponent(code);
-    if (d) return JSON.parse(d);
-  }
-  try { return JSON.parse(b64Decode(code)); } catch {}
-  return JSON.parse(code);
 }
 
 async function createHostOffer() {
@@ -428,13 +483,16 @@ async function createHostOffer() {
 }
 
 async function applyAnswer(answerCode) {
-  const answer = decodeCode(answerCode);
+  const code = extractCode(answerCode);
+  const answer = decodeCode(code);
   await pc.setRemoteDescription(answer);
   rtHandlers.onStatus("Ответ принят. Подключаемся…");
 }
 
 async function createGuestAnswer(offerCode) {
-  const offer = decodeCode(offerCode);
+  const code = extractCode(offerCode);
+  const offer = decodeCode(code);
+
   pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
   pc.ondatachannel = (e) => bindChannel(e.channel);
   watchFailure(pc);
@@ -449,9 +507,7 @@ async function createGuestAnswer(offerCode) {
   return encodeCode(pc.localDescription);
 }
 
-/* ============================================================
-   SCENE — Three.js
-   ============================================================ */
+/* ═══════════ SCENE ═══════════ */
 let renderer, scene3d, camera, controls, boardGroup;
 let raycaster, pointer, canvas, sharedGeometry;
 let cellClickHandler = null;
@@ -594,9 +650,7 @@ function currentHitKeys(shotKeys) {
   return new Set(list || []);
 }
 
-/* ============================================================
-   PLACEMENT — расстановка
-   ============================================================ */
+/* ═══════════ PLACEMENT ═══════════ */
 function placementStart() {
   state.ships = [];
   state.enemyShips = [];
@@ -666,9 +720,7 @@ function finishPlacement() {
   }
 }
 
-/* ============================================================
-   BATTLE — партия
-   ============================================================ */
+/* ═══════════ BATTLE ═══════════ */
 function startAsHost() {
   if (state.phase !== "placement") return;
   if (state.ships.length      !== FLEET.length) return;
@@ -676,8 +728,7 @@ function startAsHost() {
 
   resetMatch();
   send({
-    type: "START",
-    turn: "host",
+    type: "START", turn: "host",
     shotsHost: [], shotsGuest: [],
     hitsHost:  [], hitsGuest:  [],
   });
@@ -807,9 +858,7 @@ function switchView(nextView) {
   drawBoard();
 }
 
-/* ============================================================
-   WIRING — связываем всё вместе
-   ============================================================ */
+/* ═══════════ WIRING ═══════════ */
 initScene($("gameCanvas"));
 
 window.addEventListener("screenchange", (e) => {
@@ -860,7 +909,7 @@ function handleIncoming(msg) {
 $("hostButton").addEventListener("click", async () => {
   state.role = "host";
   $("connectionHelp").textContent =
-    "Отправьте приглашение другу. Когда он вернёт ответ, вставьте его ниже.";
+    "Отправьте другу приглашение. Когда он пришлёт ответ, вставьте его ниже.";
   $("offerBlock").classList.remove("hidden");
   $("joinBlock").classList.add("hidden");
   showScreen("connection");
@@ -869,11 +918,15 @@ $("hostButton").addEventListener("click", async () => {
     const code = await createHostOffer();
     $("offerText").value = code;
     updateCodeMeta("offerText", "offerMeta");
-    setConnectionStatus("Приглашение готово. Скопируйте и отправьте другу.");
-    $("offerText").focus();
-    $("offerText").select();
-    if (await copyText(code))
-      setConnectionStatus("Приглашение скопировано в буфер обмена. Отправьте другу.");
+
+    const shareUrl = `${location.origin}${location.pathname}#offer=${encodeURIComponent(code)}`;
+    history.replaceState(null, "", shareUrl);
+
+    setConnectionStatus("Приглашение готово. Скопируйте ссылку и отправьте другу.");
+    const ok = await copyText(shareUrl);
+    setConnectionStatus(ok
+      ? "Ссылка скопирована. Отправьте другу."
+      : "Скопируйте ссылку вручную (кнопка «Скопировать ссылку»).");
   } catch (err) {
     setConnectionStatus("Не удалось создать приглашение: " + err.message);
   }
@@ -892,32 +945,57 @@ function openJoinFlow() {
   showScreen("connection");
 }
 
-/* ── Гость: ответ ── */
+/* ── Гость ── */
+$("pasteOfferButton").addEventListener("click", async () => {
+  const text = await readClipboard();
+  if (text == null) {
+    setConnectionStatus("Браузер не дал доступ к буферу — вставьте вручную (Ctrl+V).");
+    return;
+  }
+  $("joinOfferText").value = extractCode(text);
+  setConnectionStatus("Код из буфера вставлен.");
+});
+
 $("createAnswerButton").addEventListener("click", async () => {
-  const offerCode = $("joinOfferText").value.trim();
+  const offerCode = extractCode($("joinOfferText").value);
   if (!offerCode) { setConnectionStatus("Вставьте приглашение хоста."); return; }
   try {
     const code = await createGuestAnswer(offerCode);
     $("generatedAnswerText").value = code;
     updateCodeMeta("generatedAnswerText", "answerMeta");
+
+    const shareUrl = `${location.origin}${location.pathname}#answer=${encodeURIComponent(code)}`;
+    history.replaceState(null, "", shareUrl);
+
     $("answerBlock").classList.remove("hidden");
-    setConnectionStatus("Ответ готов. Отправьте его хосту.");
-    if (await copyText(code))
-      setConnectionStatus("Ответ скопирован в буфер обмена. Отправьте его хосту.");
-  } catch {
-    setConnectionStatus("Не удалось создать ответ. Проверьте приглашение.");
+    const ok = await copyText(shareUrl);
+    setConnectionStatus(ok
+      ? "Ответная ссылка скопирована. Отправьте её хосту."
+      : "Скопируйте ответную ссылку вручную.");
+  } catch (err) {
+    setConnectionStatus("Не удалось создать ответ: " + err.message);
   }
 });
 
 /* ── Хост: применить ответ ── */
+$("pasteAnswerButton").addEventListener("click", async () => {
+  const text = await readClipboard();
+  if (text == null) {
+    setConnectionStatus("Браузер не дал доступ к буферу — вставьте вручную (Ctrl+V).");
+    return;
+  }
+  $("answerText").value = extractCode(text);
+  setConnectionStatus("Код из буфера вставлен. Нажмите «Подключить ответ».");
+});
+
 $("applyAnswerButton").addEventListener("click", async () => {
-  const answerCode = $("answerText").value.trim();
-  if (!answerCode) { setConnectionStatus("Вставьте ответ друга."); return; }
+  const raw = $("answerText").value;
+  if (!raw.trim()) { setConnectionStatus("Вставьте ответ друга."); return; }
   try {
-    await applyAnswer(answerCode);
+    await applyAnswer(raw);
     setConnectionStatus("Ответ принят. Подключаемся…");
-  } catch {
-    setConnectionStatus("Не удалось прочитать ответ. Проверьте вставленный текст.");
+  } catch (err) {
+    setConnectionStatus("Не удалось применить ответ: " + err.message);
   }
 });
 
@@ -930,16 +1008,22 @@ $("copyOfferButton").addEventListener("click", async () => {
 $("copyOfferLinkButton").addEventListener("click", async () => {
   const code = $("offerText").value;
   if (!code) return;
-  const url = `${location.origin}${location.pathname}?offer=${encodeURIComponent(code)}`;
+  const url = `${location.origin}${location.pathname}#offer=${encodeURIComponent(code)}`;
   const ok = await copyText(url);
-  setConnectionStatus(ok
-    ? "Ссылка скопирована. Друг откроет её — приглашение подставится автоматически."
-    : "Не удалось скопировать ссылку.");
+  setConnectionStatus(ok ? "Ссылка скопирована." : "Не удалось скопировать ссылку.");
 });
 
 $("copyAnswerButton").addEventListener("click", async () => {
   const ok = await copyText($("generatedAnswerText").value);
-  setConnectionStatus(ok ? "Ответ скопирован." : "Не удалось скопировать.");
+  setConnectionStatus(ok ? "Код ответа скопирован." : "Не удалось скопировать.");
+});
+
+$("copyAnswerLinkButton").addEventListener("click", async () => {
+  const code = $("generatedAnswerText").value;
+  if (!code) return;
+  const url = `${location.origin}${location.pathname}#answer=${encodeURIComponent(code)}`;
+  const ok = await copyText(url);
+  setConnectionStatus(ok ? "Ответная ссылка скопирована." : "Не удалось скопировать ссылку.");
 });
 
 /* ── Переходы ── */
@@ -965,14 +1049,44 @@ $("finishPlacementButton").addEventListener("click", () => {
 $("targetViewButton").addEventListener("click", () => switchView("target"));
 $("ownViewButton").addEventListener("click",    () => switchView("own"));
 
-/* ── Автоподстановка приглашения из URL ── */
-const offerFromUrl = new URLSearchParams(location.search).get("offer");
-if (offerFromUrl) {
-  state.role = "guest";
-  openJoinFlow();
-  $("joinOfferText").value = offerFromUrl;
-  setConnectionStatus("Приглашение загружено из ссылки. Нажмите «Создать ответ».");
+/* ═══════════ URL / HASH обработка ═══════════ */
+
+function handleHashOnLoad() {
+  const hash = location.hash.slice(1);
+  if (!hash) return;
+
+  // Гость открыл приглашение
+  if (hash.startsWith("offer=") && !state.role) {
+    const code = decodeURIComponent(hash.slice(6));
+    state.role = "guest";
+    openJoinFlow();
+    $("joinOfferText").value = code;
+    setConnectionStatus("Приглашение загружено. Нажмите «Создать ответ».");
+    return;
+  }
+
+  // Хост открыл ответную ссылку в СВЕЖЕЙ вкладке — здесь PC нет, ничего не делаем.
+  // Если хост вставил ссылку в адресную строку ТОЙ ЖЕ вкладки — сработает hashchange.
 }
+
+// Если хост заменит #offer=... на #answer=... в адресной строке,
+// браузер НЕ перезагрузит страницу (same origin + same path), только hashchange.
+window.addEventListener("hashchange", async () => {
+  const hash = location.hash.slice(1);
+  if (!hash.startsWith("answer=")) return;
+  if (state.role !== "host" || !pc) return;
+
+  const code = decodeURIComponent(hash.slice(7));
+  $("answerText").value = code;
+  try {
+    await applyAnswer(code);
+    setConnectionStatus("Ответ применён из адресной строки. Подключаемся…");
+  } catch (err) {
+    setConnectionStatus("Не удалось применить ответ из адреса: " + err.message);
+  }
+});
+
+handleHashOnLoad();
 </script>
 </body>
 </html>
