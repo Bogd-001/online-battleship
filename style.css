@@ -10,7 +10,8 @@
 body {
   margin: 0;
   min-height: 100vh;
-  background: radial-gradient(ellipse at top, #12354a 0%, #071723 65%);
+  background:
+    radial-gradient(ellipse at top, #12354a 0%, #071723 65%);
 }
 
 main {
@@ -38,7 +39,9 @@ p { line-height: 1.5; color: #bed2dc; }
   align-items: center;
 }
 
-button, textarea, input { font: inherit; }
+button, textarea {
+  font: inherit;
+}
 
 button {
   padding: 10px 14px;
@@ -53,20 +56,16 @@ button:hover:not(:disabled) { background: #1b506c; }
 button:disabled { opacity: .45; cursor: not-allowed; }
 button.active { outline: 2px solid #69d1e7; }
 
-textarea,
-input[type="text"] {
+textarea {
   display: block;
   width: 100%;
+  min-height: 100px;
   margin: 8px 0 12px;
   padding: 10px;
   border: 1px solid #315368;
   border-radius: 8px;
   color: #e6f5fb;
   background: #06131d;
-}
-
-textarea {
-  min-height: 100px;
   resize: vertical;
 }
 
