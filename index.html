@@ -148,10 +148,24 @@ import { OrbitControls } from "three/addons/controls/OrbitControls.js";
    ============================================================ */
 const SIZE = { x: 6, y: 6, z: 4 };
 const FLEET = [4, 3, 3, 2, 2];
-const STUN_SERVERS = [
+
+// STUN + публичный TURN-ретранслятор.
+// TURN нужен, если провайдер/роутер блокирует прямой обмен (симметричный NAT,
+// CGNAT в мобильных сетях, корпоративный firewall и т.п.).
+const ICE_SERVERS = [
   { urls: "stun:stun.l.google.com:19302" },
   { urls: "stun:stun1.l.google.com:19302" },
+  {
+    urls: [
+      "turn:openrelay.metered.ca:80",
+      "turn:openrelay.metered.ca:443",
+      "turn:openrelay.metered.ca:443?transport=tcp",
+    ],
+    username: "openrelayproject",
+    credential: "openrelayproject",
+  },
 ];
+
 const ICE_GATHER_TIMEOUT_MS = 15000;
 
 const COLORS = {
@@ -290,7 +304,7 @@ function updateCodeMeta(textareaId, metaId) {
 }
 
 /* ============================================================
-   WEBRTC — обмен SDP + сжатие LZ
+   WEBRTC — обмен SDP + сжатие LZ + диагностика ICE
    ============================================================ */
 let pc = null;
 let channel = null;
@@ -325,8 +339,14 @@ function bindChannel(ch) {
 
 function watchFailure(peer) {
   peer.onconnectionstatechange = () => {
-    if (peer.connectionState === "failed")
-      rtHandlers.onStatus("Соединение не установлено. Начните заново.");
+    const s = peer.connectionState;
+    console.info("[WebRTC] connectionState:", s);
+    if (s === "failed") {
+      rtHandlers.onStatus(
+        "Соединение не установлено. Проверьте, что TURN-сервер доступен " +
+        "(в Chrome: chrome://webrtc-internals → candidatePairs)."
+      );
+    }
   };
 }
 
@@ -340,6 +360,27 @@ function waitIce(peer) {
       }
     });
   });
+}
+
+/* Считает типы ICE-кандидатов в SDP. Если relay = 0 — TURN не работает. */
+function countCandidates(desc) {
+  const sdp = desc?.sdp || "";
+  const count = (typ) =>
+    (sdp.match(new RegExp(`a=candidate:[^\\r\\n]*typ ${typ}`, "g")) || []).length;
+  return { host: count("host"), srflx: count("srflx"), relay: count("relay") };
+}
+
+function logIceSummary(desc, who) {
+  const c = countCandidates(desc);
+  console.info(`[WebRTC ${who}] ICE candidates:`, c);
+  if (c.relay === 0) {
+    console.warn(
+      `[WebRTC ${who}] TURN недоступен (relay = 0). ` +
+      `В сетях с симметричным NAT соединение может не установиться. ` +
+      `Проверьте доступ к openrelay.metered.ca.`
+    );
+  }
+  return c;
 }
 
 function b64Encode(str) {
@@ -373,7 +414,7 @@ function decodeCode(code) {
 }
 
 async function createHostOffer() {
-  pc = new RTCPeerConnection({ iceServers: STUN_SERVERS });
+  pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
   watchFailure(pc);
   bindChannel(pc.createDataChannel("game"));
 
@@ -381,6 +422,8 @@ async function createHostOffer() {
   await pc.setLocalDescription(offer);
   rtHandlers.onStatus("Готовим приглашение…");
   await waitIce(pc);
+
+  logIceSummary(pc.localDescription, "host");
   return encodeCode(pc.localDescription);
 }
 
@@ -392,7 +435,7 @@ async function applyAnswer(answerCode) {
 
 async function createGuestAnswer(offerCode) {
   const offer = decodeCode(offerCode);
-  pc = new RTCPeerConnection({ iceServers: STUN_SERVERS });
+  pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
   pc.ondatachannel = (e) => bindChannel(e.channel);
   watchFailure(pc);
 
@@ -401,6 +444,8 @@ async function createGuestAnswer(offerCode) {
   await pc.setLocalDescription(answer);
   rtHandlers.onStatus("Готовим ответ…");
   await waitIce(pc);
+
+  logIceSummary(pc.localDescription, "guest");
   return encodeCode(pc.localDescription);
 }
 
